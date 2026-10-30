@@ -1,0 +1,17 @@
+## Visual Studio / .NET build outputs
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Database / local runtime data
+*.db
+*.db-shm
+*.db-wal
+Quarantine/
+
+## OS generated files
+.DS_Store
+Thumbs.db

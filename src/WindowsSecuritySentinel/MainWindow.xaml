@@ -1,0 +1,659 @@
+<Window x:Class="WindowsSecuritySentinel.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:WindowsSecuritySentinel.ViewModels"
+        xmlns:models="clr-namespace:WindowsSecuritySentinel.Core.Models"
+        mc:Ignorable:d"
+        Title="Windows Security Sentinel" Height="820" Width="1240"
+        MinHeight="700" MinWidth="1050"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource MainBg}"
+        FontFamily="{StaticResource MainFont}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- Sidebar Navigation -->
+            <ColumnDefinition Width="250"/>
+            <!-- Content Area -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- SIDEBAR -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+                <!-- Branding Header -->
+                <StackPanel DockPanel.Dock="Top" Margin="20,24,20,24">
+                    <TextBlock Text="🛡️ Security Sentinel" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <TextBlock Text="Lightweight Security &amp; Forensics" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                </StackPanel>
+
+                <!-- Privilege Indicator Footer -->
+                <Border DockPanel.Dock="Bottom" Margin="16" Padding="12" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Text="Execution Privilege:" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding IsElevated, StringFormat='{}{0}'}" FontWeight="Bold" FontSize="12" Margin="0,2,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Standard User (asInvoker)"/>
+                                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsElevated}" Value="True">
+                                            <Setter Property="Text" Value="Administrator (Elevated)"/>
+                                            <Setter Property="Foreground" Value="#16A34A"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Navigation List -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12,0">
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" Content="📊  Main Dashboard" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Scanner" Content="🔍  Malware Scanner" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="RemoteAccess" Content="🌐  Remote Access &amp; RMM" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Startup" Content="🚀  Startup &amp; Persistence" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Network" Content="🔌  Network &amp; Ports" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="BruteForce" Content="🔐  Brute-Force &amp; Logins" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Defender" Content="🛡️  Microsoft Defender" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Quarantine" Content="📦  Quarantine Vault" Margin="0,2"/>
+                        <Button Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Reports" Content="📑  Reports &amp; History" Margin="0,2"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- MAIN VIEW CONTENT -->
+        <Grid Grid.Column="1" Margin="28">
+            <!-- 1. DASHBOARD VIEW -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Dashboard">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+
+                <StackPanel>
+                    <!-- Status Header Banner -->
+                    <Border Background="{Binding OverallStatusSeverity, Converter={StaticResource SeverityToBackgroundBrushConverter}}"
+                            BorderBrush="{Binding OverallStatusSeverity, Converter={StaticResource SeverityToBrushConverter}}"
+                            BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,24">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding StatusHeader}" FontSize="18" FontWeight="Bold" Foreground="{Binding OverallStatusSeverity, Converter={StaticResource SeverityToBrushConverter}}"/>
+                                <TextBlock Text="Live active protection posture, Microsoft Defender status, and threat metrics." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="🔄 Refresh Status" Command="{Binding RefreshDashboardCommand}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Quick Metrics 4-Card Grid -->
+                    <UniformGrid Columns="4" Margin="0,0,0,24">
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,12,0">
+                            <StackPanel>
+                                <TextBlock Text="THREATS DETECTED" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding DetectedThreatsCount}" FontSize="28" FontWeight="Bold" Foreground="{Binding OverallStatusSeverity, Converter={StaticResource SeverityToBrushConverter}}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Active unresolved findings" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,12,0">
+                            <StackPanel>
+                                <TextBlock Text="REMOTE ACCESS / RMM" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding RemoteAccessAppsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Installed &amp; portable tools" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,12,0">
+                            <StackPanel>
+                                <TextBlock Text="SUSPICIOUS STARTUP" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding SuspiciousAppsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Unsigned / anomalous items" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel>
+                                <TextBlock Text="FAILED LOGINS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding FailedLoginsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Audit log failure events" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <!-- System Security State Card -->
+                    <Border Background="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,24">
+                        <StackPanel>
+                            <TextBlock Text="System Protection Overview" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Microsoft Defender Status" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureVersion, StringFormat='Signatures: {0}'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                                    <TextBlock Text="{Binding DefenderStatus.SignatureAgeInDays, StringFormat='Signature Age: {0} days'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding DefenderStatus.RealTimeProtectionEnabled, StringFormat='Real-Time Protection: {0}'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Windows Firewall Configuration" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="{Binding FirewallSummary}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                                    <TextBlock Text="{Binding LastScanTime, StringFormat='Last Complete Scan: {0}'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Core Scanning Actions Grid (10 Buttons) -->
+                    <TextBlock Text="Security Scanners &amp; Actions" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                    <UniformGrid Columns="2">
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,10,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Quick Scan" Command="{Binding StartQuickScanCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="1. Quick Malware Scan" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Scans processes, Temp, AppData, and Downloads." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Full Scan" Command="{Binding StartFullScanCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="2. Full System Scan" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Complete deep scan across all fixed drives and files." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,10,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Custom Scan" Command="{Binding StartCustomScanCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="3. Custom Folder Scan" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Examine specific paths or user-selected folders." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="RMM Scan" Command="{Binding ScanRemoteAccessCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="4. Remote Access &amp; RMM Scan" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Forensic detection of ScreenConnect, AnyDesk, etc." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,10,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Inspect" Command="{Binding ScanStartupCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="5. Startup &amp; Persistence Inspection" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Examine registry Run, services, Winlogon, WMI." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Inspect" Command="{Binding ScanNetworkCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="6. Network Security Analysis" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Native P/Invoke TCP/UDP socket owner inspection." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,10,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Analyze" Command="{Binding ScanLoginsCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="7. Login &amp; Brute-Force Analysis" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Security Event Log XPath query &amp; RDP correlation." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Defender" Command="{Binding RunDefenderQuickScanCommand}"/>
+                                <StackPanel>
+                                    <TextBlock Text="8. Microsoft Defender Operations" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="WMI status, update signatures, trigger scan." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,10,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Vault" Command="{Binding NavigateCommand}" CommandParameter="Quarantine"/>
+                                <StackPanel>
+                                    <TextBlock Text="9. Quarantine Vault" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Inspect and restore XOR-obfuscated files (.qtn)." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Reports" Command="{Binding NavigateCommand}" CommandParameter="Reports"/>
+                                <StackPanel>
+                                    <TextBlock Text="10. Security Reports &amp; History" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="SQLite audit logs, HTML reports, CSV export." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 2. MALWARE SCANNER VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Scanner">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Scan Progress Bar & Controls -->
+                <Border Grid.Row="0" Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding ScanStage}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Text="{Binding ScanCurrentItem}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding ScanElapsedTime, StringFormat='Elapsed: {0}'}" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Button Style="{StaticResource DangerButton}" Content="Cancel Scan" Command="{Binding CancelScanCommand}" Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            </StackPanel>
+                        </Grid>
+                        <ProgressBar Height="8" Minimum="0" Maximum="100" Value="{Binding ScanProgress}" IsIndeterminate="{Binding IsScanning}"/>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="{Binding ScanFilesCount, StringFormat='Items Examined: {0:N0}'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding ThreatsDetectedCount, StringFormat='Findings: {0}'}" HorizontalAlignment="Right" FontSize="12" FontWeight="Bold" Foreground="#DC2626"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Findings Table -->
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Findings}" SelectedItem="{Binding SelectedFinding}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90"/>
+                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="140"/>
+                        <DataGridTextColumn Header="Finding Title" Binding="{Binding Title}" Width="240"/>
+                        <DataGridTextColumn Header="Target Path / Resource" Binding="{Binding TargetPath}" Width="*"/>
+                        <DataGridTextColumn Header="Digital Signature" Binding="{Binding DigitalSignatureStatus}" Width="160"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Details & Action Panel -->
+                <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedFinding.Title, FallbackValue='Select a finding above to inspect details'}" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="{Binding SelectedFinding.Evidence, FallbackValue=''}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding SelectedFinding.RecommendedAction, FallbackValue=''}" FontSize="12" Foreground="{StaticResource PrimaryBrush}" Margin="0,4,0,0" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" Content="📦 Quarantine File" Command="{Binding QuarantineSelectedFindingCommand}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 3. REMOTE ACCESS & RMM FORENSICS VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="RemoteAccess">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,16">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="🔄 Rescan RMM Software" Command="{Binding ScanRemoteAccessCommand}"/>
+                    <StackPanel>
+                        <TextBlock Text="Remote Access &amp; Tech-Support Scam Forensics" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock Text="Hunts for ScreenConnect, AnyDesk unattended access, hidden SystemComponent=1 keys, and portable runners." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding RemoteAccessTools}" SelectedItem="{Binding SelectedRemoteTool}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Risk Level" Binding="{Binding RiskLevel}" Width="100"/>
+                        <DataGridTextColumn Header="Tool Name" Binding="{Binding ToolName}" Width="200"/>
+                        <DataGridTextColumn Header="Visibility" Binding="{Binding Visibility}" Width="180"/>
+                        <DataGridTextColumn Header="Unattended Access" Binding="{Binding UnattendedAccessStatus}" Width="160"/>
+                        <DataGridTextColumn Header="Relay / Server" Binding="{Binding RelayHost}" Width="160"/>
+                        <DataGridTextColumn Header="Executable Path" Binding="{Binding ExecutablePath}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="2" Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedRemoteTool.ToolName, FallbackValue='Select a remote access tool to review'}" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="{Binding SelectedRemoteTool.RecommendedAction, FallbackValue=''}" FontSize="12" Foreground="#DC2626" Margin="0,4,0,0" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SelectedRemoteTool.ExecutablePath, StringFormat='Path: {0}'}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" Content="🛡️ One-Click Neutralize RMM" Command="{Binding NeutralizeSelectedRmmCommand}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 4. STARTUP & PERSISTENCE VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Startup">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,16">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="🔄 Refresh Startup Items" Command="{Binding ScanStartupCommand}"/>
+                    <StackPanel>
+                        <TextBlock Text="Startup &amp; Persistence Inspection" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock Text="Registry Run/RunOnce, Services, Winlogon Shell, and WMI subscriptions." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding StartupItems}" SelectedItem="{Binding SelectedStartupItem}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90"/>
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="180"/>
+                        <DataGridTextColumn Header="Type" Binding="{Binding LocationType}" Width="160"/>
+                        <DataGridTextColumn Header="Command / Target" Binding="{Binding CommandOrTarget}" Width="*"/>
+                        <DataGridTextColumn Header="Digital Signature" Binding="{Binding DigitalSignatureStatus}" Width="160"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedStartupItem.Name, FallbackValue='Select an item above to inspect'}" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="{Binding SelectedStartupItem.SuspicionReason, FallbackValue=''}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" Content="Disable Startup Item" Command="{Binding DisableSelectedStartupItemCommand}" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 5. NETWORK ANALYSIS VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Network">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,16">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="🔄 Refresh Connections" Command="{Binding ScanNetworkCommand}"/>
+                    <StackPanel>
+                        <TextBlock Text="Native Network Connection &amp; Port Inspection" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock Text="Live TCP and UDP sockets mapped to Process IDs, executables, and Authenticode signatures via iphlpapi.dll." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding NetworkConnections}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="32">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="60"/>
+                        <DataGridTextColumn Header="Local Address" Binding="{Binding LocalAddress}" Width="120"/>
+                        <DataGridTextColumn Header="Port" Binding="{Binding LocalPort}" Width="60"/>
+                        <DataGridTextColumn Header="Remote Address" Binding="{Binding RemoteAddress}" Width="140"/>
+                        <DataGridTextColumn Header="State" Binding="{Binding State}" Width="100"/>
+                        <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="60"/>
+                        <DataGridTextColumn Header="Process Name" Binding="{Binding ProcessName}" Width="140"/>
+                        <DataGridTextColumn Header="Digital Signature" Binding="{Binding DigitalSignatureStatus}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+
+            <!-- 6. BRUTE-FORCE & LOGIN ANALYSIS VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="BruteForce">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,16">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Style="{StaticResource SecondaryButton}" Content="Analyze (Standard)" Command="{Binding ScanLoginsCommand}" Margin="0,0,10,0"/>
+                        <Button Style="{StaticResource PrimaryButton}" Content="🛡️ Analyze with Admin Privileges" Command="{Binding ScanLoginsElevatedCommand}"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Login &amp; Brute-Force Attack Analysis" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock Text="Analyzes Event IDs 4625 (Failed Logon), 4740 (Lockouts), and RDP connection events." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding LoginIncidents}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90"/>
+                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="140"/>
+                        <DataGridTextColumn Header="Target Account" Binding="{Binding TargetAccount}" Width="160"/>
+                        <DataGridTextColumn Header="Source IP" Binding="{Binding SourceIp}" Width="140"/>
+                        <DataGridTextColumn Header="Logon Type" Binding="{Binding LogonTypeDescription}" Width="180"/>
+                        <DataGridTextColumn Header="Attempts" Binding="{Binding AttemptCount}" Width="80"/>
+                        <DataGridTextColumn Header="Details &amp; Reason" Binding="{Binding FailureReason}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+
+            <!-- 7. MICROSOFT DEFENDER VIEW -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Defender">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+
+                <StackPanel>
+                    <TextBlock Text="Microsoft Defender Integration" FontSize="18" FontWeight="Bold" Margin="0,0,0,16"/>
+
+                    <Border Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,20">
+                        <StackPanel>
+                            <TextBlock Text="Live WMI Protection Status (root\Microsoft\Windows\Defender)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                            <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureVersion, StringFormat='Antivirus Signature Version: {0}'}" FontSize="13" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureLastUpdated, StringFormat='Last Updated: {0:yyyy-MM-dd HH:mm}'}" FontSize="13" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding DefenderStatus.RealTimeProtectionEnabled, StringFormat='Real-Time Protection Enabled: {0}'}" FontSize="13" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding DefenderStatus.ControlledFolderAccessEnabled, StringFormat='Controlled Folder Access (Ransomware Guard): {0}'}" FontSize="13" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                        <Button Style="{StaticResource PrimaryButton}" Content="Update Signatures Now" Command="{Binding UpdateDefenderSignaturesCommand}" Margin="0,0,12,0"/>
+                        <Button Style="{StaticResource SecondaryButton}" Content="Trigger Defender Quick Scan" Command="{Binding RunDefenderQuickScanCommand}" Margin="0,0,12,0"/>
+                        <Button Style="{StaticResource SecondaryButton}" Content="Open Windows Security App" Command="{Binding OpenDefenderSecurityCenterCommand}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Active Defender Detections (MSFT_MpThreatDetection)" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                    <DataGrid ItemsSource="{Binding DefenderStatus.ActiveThreats}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" Height="250">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Threat ID" Binding="{Binding ThreatId}" Width="120"/>
+                            <DataGridTextColumn Header="Threat Name" Binding="{Binding ThreatName}" Width="220"/>
+                            <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="100"/>
+                            <DataGridTextColumn Header="Resource Path" Binding="{Binding ResourcePath}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 8. QUARANTINE VAULT VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Quarantine">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                    <TextBlock Text="Quarantine Vault" FontSize="18" FontWeight="Bold"/>
+                    <TextBlock Text="Quarantined files are neutralized via XOR-obfuscation and stored in isolated storage as .qtn." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding QuarantineEntries}" SelectedItem="{Binding SelectedQuarantineEntry}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Quarantined Date" Binding="{Binding QuarantinedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="150"/>
+                        <DataGridTextColumn Header="Category" Binding="{Binding ThreatCategory}" Width="140"/>
+                        <DataGridTextColumn Header="Original Path" Binding="{Binding OriginalPath}" Width="*"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding FileSizeBytes, StringFormat='{}{0:N0} B'}" Width="100"/>
+                        <DataGridTextColumn Header="SHA-256 Hash" Binding="{Binding Sha256Hash}" Width="200"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="2" Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource SecondaryButton}" Content="Restore File to Original Location" Command="{Binding RestoreSelectedQuarantineCommand}" Margin="0,0,12,0"/>
+                        <Button Style="{StaticResource DangerButton}" Content="Permanently Delete Threat" Command="{Binding PurgeSelectedQuarantineCommand}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 9. REPORTS & HISTORY VIEW -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentView}" Value="Reports">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                    <TextBlock Text="Scan Reports &amp; Audit Logs" FontSize="18" FontWeight="Bold"/>
+                    <TextBlock Text="Persistent local SQLite history of all security inspections and remediation events." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding ScanHistory}" AutoGenerateColumns="False" IsReadOnly="True" BorderBrush="{StaticResource BorderBrush}" Background="#FFFFFF" RowHeight="36">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Scan ID" Binding="{Binding ScanId}" Width="160"/>
+                        <DataGridTextColumn Header="Scan Type" Binding="{Binding Type}" Width="120"/>
+                        <DataGridTextColumn Header="Start Time" Binding="{Binding StartTime, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="140"/>
+                        <DataGridTextColumn Header="Duration" Binding="{Binding Duration.TotalSeconds, StringFormat='{}{0:F1}s'}" Width="90"/>
+                        <DataGridTextColumn Header="Privilege" Binding="{Binding WasElevated, StringFormat='Elevated: {0}'}" Width="120"/>
+                        <DataGridTextColumn Header="Items Examined" Binding="{Binding TotalFilesScanned, StringFormat='{}{0:N0}'}" Width="120"/>
+                        <DataGridTextColumn Header="Findings" Binding="{Binding Findings.Count}" Width="80"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="2" Background="{StaticResource CardSubtleBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource PrimaryButton}" Content="Export Latest to HTML Report" Command="{Binding ExportReportHtmlCommand}" Margin="0,0,12,0"/>
+                        <Button Style="{StaticResource SecondaryButton}" Content="Export Findings to CSV" Command="{Binding ExportReportCsvCommand}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
